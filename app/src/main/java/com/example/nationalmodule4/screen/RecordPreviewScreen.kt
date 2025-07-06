@@ -60,6 +60,7 @@ import com.example.nationalmodule4.LocalRecordDataModal
 import com.example.nationalmodule4.LocalShareModal
 import com.example.nationalmodule4.R
 import com.example.nationalmodule4.helper.PlayerModal
+import com.example.nationalmodule4.helper.timeFormatter
 import java.io.File
 
 @OptIn(UnstableApi::class)
@@ -109,15 +110,19 @@ fun RecordPreviewScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-                Box(modifier = Modifier.aspectRatio(playerState.aspectRatio)) {
-                    Card(border = CardDefaults.outlinedCardBorder()) {
-                        PlayerSurface(playerModal.player)
-                    }
+            Box(modifier = Modifier.aspectRatio(playerState.aspectRatio)) {
+                Card(border = CardDefaults.outlinedCardBorder()) {
+                    PlayerSurface(playerModal.player)
                 }
+            }
             Spacer(Modifier.height(20.dp))
             Slider(playerState.currentPosition, onValueChange = {
                 playerModal.seekTo(it.toLong())
             }, valueRange = 0f..if (playerState.duration > 0f) playerState.duration else 0f)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(timeFormatter(playerState.duration.toLong()))
+                Text(timeFormatter(playerState.currentPosition.toLong()))
+            }
             Spacer(Modifier.height(20.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),

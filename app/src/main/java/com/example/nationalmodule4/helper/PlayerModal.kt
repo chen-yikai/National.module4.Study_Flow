@@ -45,8 +45,10 @@ class PlayerModal : ViewModel() {
     private var job: Job? = null
 
 
+    @OptIn(UnstableApi::class)
     fun setMediaItem(path: String, context: Context) {
         try {
+            dispose()
             _playerState.update {
                 it.copy(
                     isPlaying = false,
@@ -57,7 +59,18 @@ class PlayerModal : ViewModel() {
                 )
             }
             Log.i("trigger modal", "player is init")
-            _player = ExoPlayer.Builder(context).build().apply {
+                _player = ExoPlayer.Builder(context)
+                    .setLoadControl(
+                        androidx.media3.exoplayer.DefaultLoadControl.Builder()
+//                            .setBufferDurationsMs(
+//                                15000,
+//                                50000,
+//                                1500,
+//                                5000
+//                            )
+                            .build()
+                    )
+                    .build().apply {
                 setMediaItem(MediaItem.Builder().setUri(Uri.fromFile(File(path))).build())
                 prepare()
                 addListener(object : Listener {

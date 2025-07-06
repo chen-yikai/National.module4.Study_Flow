@@ -208,11 +208,15 @@ class ScreenRecordingService : Service() {
                             inputBuffer.clear()
                             val length = minOf(read, inputBuffer.capacity())
                             inputBuffer.put(audioBuffer, 0, length)
+                            
+                            // Use simple system timestamp for audio
+                            val presentationTimeUs = System.nanoTime() / 1000L
+                            
                             audioEncoder!!.queueInputBuffer(
                                 inputIndex,
                                 0,
                                 length,
-                                System.nanoTime() / 1000,
+                                presentationTimeUs,
                                 0
                             )
                         }
@@ -228,7 +232,7 @@ class ScreenRecordingService : Service() {
                         outAudioIndex = audioEncoder!!.dequeueOutputBuffer(audioInfo, 0)
                     }
                 } catch (e: Exception) {
-                    Log.e("ScreenRecording", "Error recording", e)
+                    Log.e("ScreenRecording", "Error during recording: ${e.message}", e)
                 }
             }
         }
