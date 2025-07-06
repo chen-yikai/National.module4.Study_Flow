@@ -11,10 +11,9 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.io.File
 
 @Entity(tableName = "records")
 data class Record(
@@ -30,14 +29,26 @@ interface RecordDao {
     @Query("SELECT 1")
     suspend fun comeAlive(): Int
 
-    @Query("SELECT * FROM records")
+    @Query("SELECT * FROM records ORDER BY date DESC")
     fun getAll(): Flow<List<Record>>
+
+    @Query("SELECT * FROM records WHERE name LIKE :search ORDER BY date DESC")
+    fun getAllLatest(search: String): Flow<List<Record>>
+
+    @Query("SELECT * FROM records WHERE name LIKE :search ORDER BY date ASC")
+    fun getAllOldest(search: String): Flow<List<Record>>
+
+    @Query("SELECT * FROM records WHERE id = :id LIMIT 1")
+    suspend fun get(id: String): Record
 
     @Insert
     suspend fun add(record: Record)
 
     @Query("UPDATE records SET name = :name WHERE id = :id")
     suspend fun updateName(id: String, name: String)
+
+    @Query("DELETE FROM records WHERE id = :id")
+    suspend fun deleteRecord(id: String)
 }
 
 @Database(entities = [Record::class], version = 2)
@@ -45,17 +56,9 @@ abstract class StudyFlowDataBase : RoomDatabase() {
     abstract fun recordDao(): RecordDao
 }
 
-object StudyFlowRepo {
-    private var instance: StudyFlowDataBase? = null
-
-    fun getDataBase(context: Context): StudyFlowDataBase {
-        return instance ?: synchronized(this) {
-            val db = Room.databaseBuilder(context, StudyFlowDataBase::class.java, "study_flow_db")
-                .fallbackToDestructiveMigration().build()
-            instance = db
-            db
-        }
-    }
+fun getDataBase(context: Context): StudyFlowDataBase {
+    return Room.databaseBuilder(context, StudyFlowDataBase::class.java, "study_flow_db")
+        .fallbackToDestructiveMigration().build()
 }
 
 class RecordDataModal(private val dao: RecordDao) : ViewModel() {
@@ -64,6 +67,29 @@ class RecordDataModal(private val dao: RecordDao) : ViewModel() {
     init {
         viewModelScope.launch {
             dao.comeAlive()
+        }
+    }
+
+    fun get(search: String, latest: Boolean): Flow<List<Record>> {
+        if (latest) {
+            return dao.getAllLatest(search)
+        }
+        return dao.getAllOldest(search)
+
+    }
+
+    fun getById(id: String): Flow<Record?> {
+        return kotlinx.coroutines.flow.flow {
+            if (id.isNotEmpty()) {
+                try {
+                    val record = dao.get(id)
+                    emit(record)
+                } catch (e: Exception) {
+                    emit(null)
+                }
+            } else {
+                emit(null)
+            }
         }
     }
 
@@ -76,4 +102,12 @@ class RecordDataModal(private val dao: RecordDao) : ViewModel() {
             dao.updateName(id, name)
         }
     }
+
+    fun deleteRecord(record: Record) {
+        viewModelScope.launch {
+            dao.deleteRecord(record.id)
+            File(record.path).delete()
+        }
+    }
+
 }

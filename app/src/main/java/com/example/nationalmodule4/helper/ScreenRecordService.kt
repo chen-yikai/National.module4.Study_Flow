@@ -1,4 +1,4 @@
-package com.example.nationalmodule4.service
+package com.example.nationalmodule4.helper
 
 import android.Manifest
 import android.app.*
@@ -13,13 +13,9 @@ import android.os.*
 import android.util.*
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.example.nationalmodule4.room.Record
-import com.example.nationalmodule4.room.StudyFlowRepo
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.*
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 data class RecordState(
@@ -114,7 +110,7 @@ class ScreenRecordingService : Service() {
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
             )
             setInteger(MediaFormat.KEY_BIT_RATE, width * height * 5)
-            setInteger(MediaFormat.KEY_FRAME_RATE, 30)
+            setInteger(MediaFormat.KEY_FRAME_RATE, 60)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
         }
 
@@ -188,47 +184,51 @@ class ScreenRecordingService : Service() {
             val audioBuffer = ByteArray(minBuffer)
 
             while (isActive) {
-                val outIndex = videoEncoder!!.dequeueOutputBuffer(videoInfo, 10000)
-                if (outIndex >= 0) {
-                    val encodedData = videoEncoder!!.getOutputBuffer(outIndex)!!
-                    if ((videoInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
-                        if (!muxerStarted) {
-                            videoTrackIndex = muxer!!.addTrack(videoEncoder!!.outputFormat)
-                            audioTrackIndex = muxer!!.addTrack(audioEncoder!!.outputFormat)
-                            muxer!!.start()
-                            muxerStarted = true
+                try {
+                    val outIndex = videoEncoder!!.dequeueOutputBuffer(videoInfo, 10000)
+                    if (outIndex >= 0) {
+                        val encodedData = videoEncoder!!.getOutputBuffer(outIndex)!!
+                        if ((videoInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                            if (!muxerStarted) {
+                                videoTrackIndex = muxer!!.addTrack(videoEncoder!!.outputFormat)
+                                audioTrackIndex = muxer!!.addTrack(audioEncoder!!.outputFormat)
+                                muxer!!.start()
+                                muxerStarted = true
+                            }
+                            muxer!!.writeSampleData(videoTrackIndex, encodedData, videoInfo)
                         }
-                        muxer!!.writeSampleData(videoTrackIndex, encodedData, videoInfo)
+                        videoEncoder!!.releaseOutputBuffer(outIndex, false)
                     }
-                    videoEncoder!!.releaseOutputBuffer(outIndex, false)
-                }
 
-                val read = audioRecord!!.read(audioBuffer, 0, audioBuffer.size)
-                if (read > 0) {
-                    val inputIndex = audioEncoder!!.dequeueInputBuffer(10000)
-                    if (inputIndex >= 0) {
-                        val inputBuffer = audioEncoder!!.getInputBuffer(inputIndex)!!
-                        inputBuffer.clear()
-                        val length = minOf(read, inputBuffer.capacity())
-                        inputBuffer.put(audioBuffer, 0, length)
-                        audioEncoder!!.queueInputBuffer(
-                            inputIndex,
-                            0,
-                            length,
-                            System.nanoTime() / 1000,
-                            0
-                        )
+                    val read = audioRecord!!.read(audioBuffer, 0, audioBuffer.size)
+                    if (read > 0) {
+                        val inputIndex = audioEncoder!!.dequeueInputBuffer(10000)
+                        if (inputIndex >= 0) {
+                            val inputBuffer = audioEncoder!!.getInputBuffer(inputIndex)!!
+                            inputBuffer.clear()
+                            val length = minOf(read, inputBuffer.capacity())
+                            inputBuffer.put(audioBuffer, 0, length)
+                            audioEncoder!!.queueInputBuffer(
+                                inputIndex,
+                                0,
+                                length,
+                                System.nanoTime() / 1000,
+                                0
+                            )
+                        }
                     }
-                }
 
-                var outAudioIndex = audioEncoder!!.dequeueOutputBuffer(audioInfo, 0)
-                while (outAudioIndex >= 0) {
-                    val outBuf = audioEncoder!!.getOutputBuffer(outAudioIndex)!!
-                    if ((audioInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && muxerStarted) {
-                        muxer!!.writeSampleData(audioTrackIndex, outBuf, audioInfo)
+                    var outAudioIndex = audioEncoder!!.dequeueOutputBuffer(audioInfo, 0)
+                    while (outAudioIndex >= 0) {
+                        val outBuf = audioEncoder!!.getOutputBuffer(outAudioIndex)!!
+                        if ((audioInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0 && muxerStarted) {
+                            muxer!!.writeSampleData(audioTrackIndex, outBuf, audioInfo)
+                        }
+                        audioEncoder!!.releaseOutputBuffer(outAudioIndex, false)
+                        outAudioIndex = audioEncoder!!.dequeueOutputBuffer(audioInfo, 0)
                     }
-                    audioEncoder!!.releaseOutputBuffer(outAudioIndex, false)
-                    outAudioIndex = audioEncoder!!.dequeueOutputBuffer(audioInfo, 0)
+                } catch (e: Exception) {
+                    Log.e("ScreenRecording", "Error recording", e)
                 }
             }
         }

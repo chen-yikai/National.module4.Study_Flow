@@ -1,8 +1,6 @@
 package com.example.nationalmodule4
 
 import android.Manifest
-import android.app.Activity
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,7 +10,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
-import com.example.nationalmodule4.service.ScreenRecordingService
 import com.example.nationalmodule4.ui.theme.Nationalmodule4Theme
 
 class MainActivity : ComponentActivity() {
